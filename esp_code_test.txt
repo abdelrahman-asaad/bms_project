@@ -1,0 +1,58 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// --- إعدادات الواي فاي ---
+const char* ssid = "Orange-5XEy";
+const char* password = "556633448899";
+
+// --- إعدادات السيرفر ---
+// استبدل 192.168.1.X بالـ IP الخاص بجهاز الكمبيوتر بتاعك
+const char* serverName = "http://192.168.1.7:8000/monitoring/api/data/";
+
+void setup() {
+  Serial.begin(115200);
+  
+  // الاتصال بالواي فاي
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nConnected to WiFi!");
+
+  sendDataToServer();
+
+  // الدخول في وضع النوم العميق (Deep Sleep) لمدة 30 ثانية
+  Serial.println("Going to sleep for 30 seconds...");
+  esp_sleep_enable_timer_wakeup(30 * 1000000); // الوقت بالميكرو ثانية
+  esp_deep_sleep_start();
+}
+
+void loop() {
+  // فارغ لأن الجهاز بيعمل Restart بعد ما يصحى من النوم
+}
+
+void sendDataToServer() {
+  if(WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverName);
+    http.addHeader("Content-Type", "application/json");
+
+    // البيانات اللي هنبعتها (تأكد أن الـ device_id موجود في الـ Admin)
+    String jsonPayload = "{\"device_id\":\"ESP32_01\", \"voltage\":3.7}";
+
+    int httpResponseCode = http.POST(jsonPayload);
+
+    if (httpResponseCode > 0) {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
+      String payload = http.getString();
+      Serial.println("Response: " + payload);
+    } else {
+      Serial.print("Error code: ");
+      Serial.println(httpResponseCode);
+    }
+    http.end();
+  }
+}

@@ -1,0 +1,165 @@
+
+---------------------------------------
+تمام كده الصورة وضحت جدًا، وقرارك إن الـ ESP هو اللي يعمل averaging قبل الإرسال قرار ممتاز هندسيًا ومناسب جدًا لنظام شغال على بطارية.
+
+خلّينا نفكرها مع بعض كـ System Design مش بس Database.
+
+إنت عندك:
+
+ESP → ياخد قراءات كتير → يحسب متوسط → يبعته مرة واحدة → ينام (deep sleep)
+
+يعني:
+السيرفر مش بيستقبل raw samples
+السيرفر بيستقبل Aggregated sample جاهز
+
+وده يغيّر الـ ERD فعلًا.
+
+الفرق بين الحالتين
+الحالة القديمة (لو السيرفر بيستقبل كل قراءة)
+
+كل 5 ثواني Reading
+→ محتاج AggregatedStats
+
+حالتك (ESP بيبعت متوسط جاهز)
+
+كل دقيقة مثلًا Reading واحدة
+→ خلاص دي aggregated بالفعل
+
+يبقى:
+مش محتاج جدول AggregatedStats أصلاً
+
+إذًا Reading عندك بقت إيه؟
+
+بقت:
+Reading = Period Summary مش Raw Sample
+
+يعني:
+كل row تمثل "ملخص دقيقة" مش "لحظة"
+
+القيم اللي المفروض ESP يبعتها
+
+بما إنه بيحسب متوسط، يفضل يبعته كده:
+
+device_id
+user_email
+battery_id
+avg_voltage
+avg_current
+avg_temp
+min_voltage
+max_temp
+samples_count
+period_seconds
+timestamp
+
+ليه؟
+
+علشان:
+
+min/max مهمين للسلامة
+
+samples_count نعرف الدقة
+
+period_seconds مهمة لحساب الطاقة
+
+نحسب الطاقة في السيرفر
+
+السيرفر يحسب:
+
+power_avg = avg_voltage × avg_current
+energy = power_avg × (period_seconds / 3600)
+
+وبعدين نخزنها
+
+ERD الجديد (مبسّط ومناسب أكتر ليك)
+
+بما إن:
+
+averaging حصل في الهاردوير
+
+SQLite
+
+بطارية واحدة غالبًا
+
+التصميم الأمثل:
+
+User
+
+id
+
+email
+
+Device (ESP)
+
+id
+
+device_id
+
+user_id
+
+last_seen
+
+Battery
+
+id
+
+battery_id
+
+device_id
+
+capacity_mah
+
+soh
+
+cycle_count
+
+Reading (Period Summary)
+
+id
+
+battery_id (FK)
+
+avg_voltage
+
+avg_current
+
+avg_temp
+
+min_voltage
+
+max_temp
+
+power_avg
+
+energy_wh
+
+samples_count
+
+period_seconds
+
+timestamp (indexed)
+
+ده بقى الجدول الأساسي الوحيد
+
+Alert
+
+id
+
+battery_id
+
+type
+
+value
+
+threshold
+
+triggered_at
+
+ليه مش محتاج AggregatedStats دلوقتي؟
+
+لأن:
+ESP already aggregated
+
+يعني:
+بدل 720 قراءة/ساعة
+هتبقى 60 فقط
