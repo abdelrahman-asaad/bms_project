@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="10">
+    <title>BMS Dashboard - المراقب الذكي</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card-stat { border: none; border-radius: 15px; transition: transform 0.3s; }
+        .card-stat:hover { transform: translateY(-5px); }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h2 class="text-center mb-5">لوحة مراقبة نظام إدارة البطارية (BMS)</h2>
+
+        <div class="row text-center mb-4">
+            <div class="col-md-2 mb-3">
+                <div class="card card-stat shadow-sm bg-white p-3">
+                    <h6 class="text-muted">SOC (الشحن)</h6>
+                    <h3 class="text-primary">95%</h3> </div>
+            </div>
+            <div class="col-md-2 mb-3">
+                <div class="card card-stat shadow-sm bg-white p-3">
+                    <h6 class="text-muted">SOH (الصحة)</h6>
+                    <h3 class="text-success">{{ last_reading.battery.soh }}%</h3>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat shadow-sm bg-white p-3">
+                    <h6 class="text-muted">Power (القدرة)</h6>
+                    <h3 class="text-warning">{{ last_reading.power_avg }} W</h3>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card card-stat shadow-sm bg-white p-3">
+                    <h6 class="text-muted">Energy (الطاقة)</h6>
+                    <h3 class="text-info">{{ last_reading.energy_wh }} Wh</h3>
+                </div>
+            </div>
+            <div class="col-md-2 mb-3">
+                <div class="card card-stat shadow-sm bg-white p-3">
+                    <h6 class="text-muted">Cycles (الدورات)</h6>
+                    <h3 class="text-danger">{{ last_reading.battery.cycle_count }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 pt-3">
+            <div class="card-body">
+                <table class="table table-hover align-middle text-center">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>التوقيت</th>
+                            <th>الجهد (V)</th>
+                            <th>التيار (A)</th>
+                            <th>الحرارة (C°)</th>
+                            <th>القدرة (W)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in readings %}
+                        <tr>
+                            <td>{{ r.timestamp|date:"H:i:s" }}</td>
+                            <td class="fw-bold">{{ r.avg_voltage }} V</td>
+                            <td>{{ r.avg_current }} A</td>
+                            <td>{{ r.avg_temp }} °</td>
+                            <td>{{ r.power_avg }} W</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

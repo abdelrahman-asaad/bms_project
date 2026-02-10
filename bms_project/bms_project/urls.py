@@ -5,4 +5,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # ربط روابط تطبيق monitoring بالمشروع
     path('monitoring/', include('monitoring.urls')), 
+    
 ]

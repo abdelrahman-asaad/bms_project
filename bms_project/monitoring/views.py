@@ -1,8 +1,11 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
-from .models import Device, Reading # تأكد من استيراد الموديلات الصحيحة
-from django.utils import timezone # تأكد من استيراد timezone
+from .models import Device, Reading, Battery
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 @csrf_exempt
 def receive_data(request):
@@ -12,36 +15,59 @@ def receive_data(request):
             d_id = data.get('device_id')
             volt = data.get('voltage')
 
-            # 1. البحث عن الجهاز في قاعدة البيانات
-            # إذا لم يجد الجهاز سيعطي خطأ 404 أو يمكنك التعامل معه
-            try:
-                device = Device.objects.get(device_id=d_id)
-            except Device.DoesNotExist:
-                return JsonResponse({'status': 'error', 'message': 'Device not found'}, status=404)
+            if not d_id or volt is None:
+                return JsonResponse({'error': 'Missing device_id or voltage'}, status=400)
 
-            # 2. الحصول على البطارية المرتبطة بالجهاز
+            user = User.objects.first()
+            if not user:
+                return JsonResponse({'error': 'No user in DB'}, status=400)
+
+            device, created = Device.objects.get_or_create(
+                device_id=d_id,
+                defaults={'user': user}
+            )
+
             battery = device.batteries.first()
             if not battery:
-                return JsonResponse({'status': 'error', 'message': 'No battery linked to this device'}, status=400)
+                battery = Battery.objects.create(
+                    device=device,
+                    battery_id=f"BATT_{d_id}",
+                    capacity_mah=5000.0
+                )
 
-            # 3. تسجيل القراءة
             Reading.objects.create(
                 battery=battery,
-                avg_voltage=volt,
+                avg_voltage=float(volt),
                 avg_current=0.0,
                 avg_temp=25.0,
-                min_voltage=volt,
+                min_voltage=float(volt),
                 max_temp=25.0,
                 power_avg=0.0,
                 energy_wh=0.0,
                 samples_count=1,
                 period_seconds=60,
-                timestamp=timezone.now() # تأكد من عمل import timezone
+                timestamp=timezone.now()
             )
 
-            return JsonResponse({'status': 'success', 'device': device.device_id}, status=201)
+            print(f"SUCCESS: Data saved for Device: {d_id}")
+            return JsonResponse({'status': 'success'}, status=201)
 
         except Exception as e:
+            # هنا حذفنا الإيموجي لتجنب UnicodeEncodeError
+            print(f"ERROR: {str(e)}")
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
             
     return JsonResponse({'status': 'invalid_method'}, status=405)
+
+from django.shortcuts import render
+from .models import Reading
+
+def dashboard(request):
+    readings = Reading.objects.all().order_by('-timestamp')[:20]
+    last_reading = readings[0] if readings else None
+    
+    context = {
+        'readings': readings,
+        'last_reading': last_reading,
+    }
+    return render(request, 'monitoring/dashboard.html', context)
