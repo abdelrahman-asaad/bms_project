@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Device, Battery, Reading, Alert
+from .models import User, Device, Battery, Reading, Alert, PulseTest
 
 # -------- User --------
 #@admin.register(User)
@@ -47,3 +47,49 @@ class AlertAdmin(admin.ModelAdmin):
     list_filter = ('alert_type', 'severity', 'is_resolved')
     search_fields = ('battery__battery_id', 'battery__device__device_id')
     ordering = ('-triggered_at',)
+
+
+# -------- PulseTest --------
+@admin.register(PulseTest)
+class PulseTestAdmin(admin.ModelAdmin):
+    # الأعمدة اللي هتظهر في الجدول الرئيسي
+    list_display = (
+        'battery', 
+        'v_before', 
+        'v_after', 
+        'current_ma', 
+        'internal_resistance_display', # هنعرفها تحت عشان نظهر الوحدة
+        'calculated_soc_display',
+        'calculated_soh_display',
+        'timestamp'
+    )
+    
+    # إضافة فلاتر على الجنب لسهولة البحث
+    list_filter = ('battery', 'timestamp')
+    
+    # إضافة إمكانية البحث بمعرف البطارية
+    search_fields = ('battery__battery_id',)
+    
+    # جعل الحقول الحسابية "للقراءة فقط" في صفحة التعديل
+    readonly_fields = ('timestamp', 'internal_resistance', 'calculated_soh', 'calculated_soc')
+
+    # تحسين شكل عرض المقاومة الداخلية في الجدول
+    def internal_resistance_display(self, obj):
+        if obj.internal_resistance:
+            return f"{obj.internal_resistance:.3f} Ω"
+        return "N/A"
+    internal_resistance_display.short_description = "Resistance (Ω)"
+
+    # تحسين شكل عرض نسبة الشحن
+    def calculated_soc_display(self, obj):
+        if obj.calculated_soc is not None:
+            return f"{obj.calculated_soc}%"
+        return "N/A"
+    calculated_soc_display.short_description = "SoC"
+
+    # تحسين شكل عرض حالة البطارية
+    def calculated_soh_display(self, obj):
+        if obj.calculated_soh is not None:
+            return f"{obj.calculated_soh}%"
+        return "N/A"
+    calculated_soh_display.short_description = "SoH"

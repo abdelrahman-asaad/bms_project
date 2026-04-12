@@ -3,76 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="refresh" content="10">
-    <title>BMS Dashboard - المراقب الذكي</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMS - لوحة التحكم</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
     <style>
-        body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card-stat { border: none; border-radius: 15px; transition: transform 0.3s; }
-        .card-stat:hover { transform: translateY(-5px); }
+        body { background-color: #f0f2f5; font-family: sans-serif; }
+        .stat-card { border: none; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .value-large { font-size: 2rem; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container py-5">
-        <h2 class="text-center mb-5">لوحة مراقبة نظام إدارة البطارية (BMS)</h2>
+        <h2 class="text-center mb-5 fw-bold">نظام مراقبة البطارية (BMS)</h2>
 
+        {% if last_reading %}
         <div class="row text-center mb-4">
-            <div class="col-md-2 mb-3">
-                <div class="card card-stat shadow-sm bg-white p-3">
-                    <h6 class="text-muted">SOC (الشحن)</h6>
-                    <h3 class="text-primary">95%</h3> </div>
-            </div>
-            <div class="col-md-2 mb-3">
-                <div class="card card-stat shadow-sm bg-white p-3">
-                    <h6 class="text-muted">SOH (الصحة)</h6>
-                    <h3 class="text-success">{{ last_reading.battery.soh }}%</h3>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card p-3">
+                    <span class="text-muted">SOC (الشحن)</span>
+                    <div class="value-large text-primary">{{ last_soc|floatformat:1 }}%</div>
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card card-stat shadow-sm bg-white p-3">
-                    <h6 class="text-muted">Power (القدرة)</h6>
-                    <h3 class="text-warning">{{ last_reading.power_avg }} W</h3>
+                <div class="card stat-card p-3">
+                    <span class="text-muted">SOH (الصحة)</span>
+                    <div class="value-large text-success">{{ last_pulse.calculated_soh|floatformat:1 }}%</div>
+                    <small class="text-muted">المقاومة: {{ last_pulse.internal_resistance|floatformat:3 }} Ω</small>
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card card-stat shadow-sm bg-white p-3">
-                    <h6 class="text-muted">Energy (الطاقة)</h6>
-                    <h3 class="text-info">{{ last_reading.energy_wh }} Wh</h3>
+                <div class="card stat-card p-3">
+                    <span class="text-muted">Power & Current</span>
+                    <div class="value-large text-warning">{{ last_reading.power_avg|floatformat:2 }} W</div>
+                    <div class="fw-bold">{{ last_reading.avg_current|floatformat:1 }} mA</div>
                 </div>
             </div>
-            <div class="col-md-2 mb-3">
-                <div class="card card-stat shadow-sm bg-white p-3">
-                    <h6 class="text-muted">Cycles (الدورات)</h6>
-                    <h3 class="text-danger">{{ last_reading.battery.cycle_count }}</h3>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card p-3">
+                    <span class="text-muted">الحرارة</span>
+                    <div class="value-large text-info">{{ last_reading.avg_temp|floatformat:1 }} °C</span>
                 </div>
             </div>
         </div>
 
-        <div class="card shadow-sm border-0 pt-3">
-            <div class="card-body">
+        <div class="bg-white rounded-4 p-4 shadow-sm mt-4">
+            <h5 class="fw-bold mb-4">سجل اختبارات النبضة (Pulse Test Log)</h5>
+            <div class="table-responsive">
                 <table class="table table-hover align-middle text-center">
-                    <thead class="table-dark">
+                    <thead class="table-light">
                         <tr>
-                            <th>التوقيت</th>
-                            <th>الجهد (V)</th>
-                            <th>التيار (A)</th>
-                            <th>الحرارة (C°)</th>
-                            <th>القدرة (W)</th>
+                            <th>الوقت</th>
+                            <th>قبل النبضة (V)</th>
+                            <th>تحت الحمل (V)</th>
+                            <th>التيار (mA)</th>
+                            <th>المقاومة (Ω)</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for r in readings %}
                         <tr>
                             <td>{{ r.timestamp|date:"H:i:s" }}</td>
-                            <td class="fw-bold">{{ r.avg_voltage }} V</td>
-                            <td>{{ r.avg_current }} A</td>
-                            <td>{{ r.avg_temp }} °</td>
-                            <td>{{ r.power_avg }} W</td>
+                            <td class="fw-bold">{{ r.avg_voltage|stringformat:".3f" }} V</td>
+                            <td class="text-primary">{{ r.min_voltage|stringformat:".3f" }} V</td>
+                            <td class="fw-bold text-danger">{{ r.avg_current|floatformat:1 }} mA</td>
+                            <td>
+                                {% with pt=r.battery.pulse_tests.all|dictsortreversed:"timestamp"|first %}
+                                    <span class="badge bg-light text-dark border">
+                                        {{ pt.internal_resistance|floatformat:3 }} Ω
+                                    </span>
+                                {% endwith %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
+        {% else %}
+        <div class="alert alert-light text-center">في انتظار استقبال البيانات من الـ ESP32...</div>
+        {% endif %}
     </div>
 </body>
 </html>

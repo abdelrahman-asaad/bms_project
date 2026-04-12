@@ -71,12 +71,12 @@ class Reading(models.Model):
     avg_current = models.FloatField()
     avg_temp = models.FloatField()
     min_voltage = models.FloatField()
-    max_temp = models.FloatField()
-    power_avg = models.FloatField()
-    energy_wh = models.FloatField()
-    samples_count = models.IntegerField()
-    period_seconds = models.IntegerField()
-    timestamp = models.DateTimeField()
+    max_temp = models.FloatField(null=True, blank=True)  # تعديل
+    power_avg = models.FloatField(null=True, blank=True) # تعديل
+    energy_wh = models.FloatField(null=True, blank=True) # تعديل
+    samples_count = models.IntegerField(default=1)       # تعديل (قيمة افتراضية)
+    period_seconds = models.IntegerField(default=5)      # تعديل (قيمة افتراضية)
+    timestamp = models.DateTimeField(auto_now_add=True)  # تعديل (ليأخذ الوقت الحالي تلقائياً)
 
     class Meta:
         ordering = ['-timestamp']
@@ -85,8 +85,7 @@ class Reading(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.battery.battery_id} - {self.timestamp}"
-
+        return f"{self.battery.name} - {self.timestamp}"
 # -------- Alert --------
 class Alert(models.Model):
     ALERT_TYPES = [
@@ -109,3 +108,17 @@ class Alert(models.Model):
 
     def __str__(self):
         return f"{self.alert_type} - {self.battery.battery_id} - {self.triggered_at}"
+
+class PulseTest(models.Model):
+    battery = models.ForeignKey(Battery, on_delete=models.CASCADE, related_name='pulse_tests')
+    v_before = models.FloatField()
+    v_after = models.FloatField()
+    current_ma = models.FloatField()
+    temperature_c = models.FloatField()
+    
+    # حقول حسابية
+    internal_resistance = models.FloatField(null=True, blank=True)
+    calculated_soh = models.FloatField(null=True, blank=True)
+    calculated_soc = models.FloatField(null=True, blank=True) # نسبة الشحن %
+    
+    timestamp = models.DateTimeField(auto_now_add=True)
