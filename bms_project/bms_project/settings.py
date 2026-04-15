@@ -15,7 +15,7 @@ DEBUG = not ON_PYTHONANYWHERE
 
 if ON_PYTHONANYWHERE:
     # استبدل 'yourusername' باسم حسابك الحقيقي على الموقع
-    ALLOWED_HOSTS = ['AbdelrahmanAsaad.pythonanywhere.com'] 
+    ALLOWED_HOSTS = ['asaad77.pythonanywhere.com'] 
 else:
     ALLOWED_HOSTS = ['*']
 
