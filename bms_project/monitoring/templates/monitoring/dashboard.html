@@ -1,87 +1,294 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="10">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BMS - لوحة التحكم</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <title>BMS Pro | Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #f0f2f5; font-family: sans-serif; }
-        .stat-card { border: none; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .value-large { font-size: 2rem; font-weight: bold; }
+        body { background-color: #f4f7f6; font-family: 'Cairo', sans-serif; }
+        .nav-custom { background: #1a1a1a; padding: 12px 0; color: white; }
+        .card { border: none; border-radius: 15px; transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .stat-card { border-bottom: 5px solid transparent; min-height: 110px; display: flex; flex-direction: column; justify-content: center; }
+        .value-display { font-size: 1.5rem; font-weight: 700; margin-top: 5px; line-height: 1; }
+        .unit { font-size: 0.8rem; color: #6c757d; font-weight: normal; margin-left: 2px; }
+        .copy-box { background: #f8f9fa; border: 1px solid #ddd; padding: 8px 12px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* تنسيق أزرار البطاريات المصغر */
+        .battery-wrapper { display: inline-flex; align-items: center; margin-right: 6px; margin-bottom: 6px; border-radius: 20px; overflow: hidden; }
+        .battery-link { 
+            font-size: 0.85rem; 
+            padding: 4px 12px; 
+            text-decoration: none; 
+            font-weight: 600;
+        }
+        .quick-del { 
+            font-size: 0.85rem; 
+            padding: 4px 8px; 
+            cursor: pointer; 
+            border-left: 1px solid rgba(255,255,255,0.2);
+            transition: 0.2s;
+        }
+        .quick-del:hover { background: #dc3545 !important; color: white !important; }
     </style>
 </head>
 <body>
-    <div class="container py-5">
-        <h2 class="text-center mb-5 fw-bold">نظام مراقبة البطارية (BMS)</h2>
 
-        {% if last_reading %}
-        <div class="row text-center mb-4">
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card p-3">
-                    <span class="text-muted">SOC (الشحن)</span>
-                    <div class="value-large text-primary">{{ last_soc|floatformat:1 }}%</div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card p-3">
-                    <span class="text-muted">SOH (الصحة)</span>
-                    <div class="value-large text-success">{{ last_pulse.calculated_soh|floatformat:1 }}%</div>
-                    <small class="text-muted">المقاومة: {{ last_pulse.internal_resistance|floatformat:3 }} Ω</small>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card p-3">
-                    <span class="text-muted">Power & Current</span>
-                    <div class="value-large text-warning">{{ last_reading.power_avg|floatformat:2 }} W</div>
-                    <div class="fw-bold">{{ last_reading.avg_current|floatformat:1 }} mA</div>
-                </div>
-            </div>
-            <div class="col-md-3 mb-3">
-                <div class="card stat-card p-3">
-                    <span class="text-muted">الحرارة</span>
-                    <div class="value-large text-info">{{ last_reading.avg_temp|floatformat:1 }} °C</span>
-                </div>
+    <nav class="nav-custom shadow-sm mb-4">
+        <div class="container d-flex justify-content-between align-items-center">
+            <h4 class="m-0 fw-bold text-info"><i class="bi bi-battery-charging me-2"></i> BMS MONITOR</h4>
+            <div class="d-flex align-items-center">
+                <span class="me-3 small"><i class="bi bi-person-circle"></i> {{ display_name }}</span>
+                <a href="{% url 'logout' %}" class="btn btn-sm btn-outline-danger rounded-pill px-3">Logout</a>
             </div>
         </div>
+    </nav>
 
-        <div class="bg-white rounded-4 p-4 shadow-sm mt-4">
-            <h5 class="fw-bold mb-4">سجل اختبارات النبضة (Pulse Test Log)</h5>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle text-center">
-                    <thead class="table-light">
-                        <tr>
-                            <th>الوقت</th>
-                            <th>قبل النبضة (V)</th>
-                            <th>تحت الحمل (V)</th>
-                            <th>التيار (mA)</th>
-                            <th>المقاومة (Ω)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in readings %}
-                        <tr>
-                            <td>{{ r.timestamp|date:"H:i:s" }}</td>
-                            <td class="fw-bold">{{ r.avg_voltage|stringformat:".3f" }} V</td>
-                            <td class="text-primary">{{ r.min_voltage|stringformat:".3f" }} V</td>
-                            <td class="fw-bold text-danger">{{ r.avg_current|floatformat:1 }} mA</td>
-                            <td>
-                                {% with pt=r.battery.pulse_tests.all|dictsortreversed:"timestamp"|first %}
-                                    <span class="badge bg-light text-dark border">
-                                        {{ pt.internal_resistance|floatformat:3 }} Ω
-                                    </span>
-                                {% endwith %}
-                            </td>
-                        </tr>
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show rounded-4 shadow-sm mb-4" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            // {% endfor %}
+        {% endif %}
+
+        {% if current_battery %}
+            <div class="row mb-4 align-items-center">
+                <div class="col-md-7">
+                    <h3 class="fw-bold m-0">Battery: <span class="text-primary">{{ current_battery.battery_id }}</span></h3>
+                    
+                    <div class="mt-2 mb-2">
+                        {% for batt in user_batteries %}
+                            <div class="battery-wrapper shadow-sm">
+                                <a href="?battery_id={{ batt.id }}" 
+                                   class="battery-link {% if batt.id == current_battery.id %}bg-primary text-white{% else %}bg-dark text-white opacity-75{% endif %}">
+                                   {{ batt.battery_id }}
+                                </a>
+                                <div class="quick-del {% if batt.id == current_battery.id %}bg-primary text-white{% else %}bg-dark text-white opacity-75{% endif %}"
+                                     onclick="confirmDelete('{{ batt.id }}', '{{ batt.battery_id }}')">
+                                    <i class="bi bi-x"></i>
+                                </div>
+                            </div>
                         {% endfor %}
-                    </tbody>
-                </table>
+                    </div>
+                    
+                    <p class="text-muted small mb-0">Type: {{ current_battery.chemistry|upper }} | Capacity: {{ current_battery.capacity_mah }} mAh</p>
+                </div>
+                <div class="col-md-5 text-md-end mt-3 mt-md-0">
+                    <button class="btn btn-dark shadow-sm px-4 rounded-pill" data-bs-toggle="modal" data-bs-target="#deviceSettingsModal">
+                        <i class="bi bi-gear-fill me-2"></i> Device Settings
+                    </button>
+                </div>
             </div>
-        </div>
+
+            {% if last_pulse %}
+                <div class="row g-3 mb-4 text-center">
+                    <div class="col-6 col-md-2">
+                        <div class="card stat-card p-2 bg-white border-warning">
+                            <small class="text-muted fw-bold">Power</small>
+                            <div class="value-display text-warning">
+                                {% widthratio last_pulse.v_before 1 last_pulse.current_ma as raw_p %}
+                                {{ raw_p|add:"0"|slugify|slice:":-3"|default:"0" }}.{{ raw_p|slice:"-3:-1"|default:"00" }}<span class="unit">W</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="card stat-card p-2 bg-white border-info">
+                            <small class="text-muted fw-bold">Energy</small>
+                            <div class="value-display text-info">{{ total_energy|default:"0.0" }}<span class="unit">Wh</span></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="card stat-card p-2 bg-white border-secondary">
+                            <small class="text-muted fw-bold">Temp</small>
+                            <div class="value-display text-secondary">{{ last_pulse.temperature_c|floatformat:1 }}<span class="unit">°C</span></div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="card stat-card p-2 bg-white border-dark">
+                            <small class="text-muted fw-bold">Cycles</small>
+                            <div class="value-display text-dark">{{ current_battery.cycle_count|floatformat:2|default:"0" }}</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="card stat-card p-2 bg-white border-success">
+                            <small class="text-muted fw-bold">Health (SOH)</small>
+                            <div class="value-display text-success">{{ last_pulse.calculated_soh|floatformat:0 }}<span class="unit">%</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card p-4 border-0 shadow-sm">
+                            <div class="d-flex justify-content-between mb-2 small fw-bold">
+                                <span>Real-time Charge (SOC)</span>
+                                <span class="text-primary">{{ last_soc }}%</span>
+                            </div>
+                            <div class="progress" style="height: 20px; border-radius: 10px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated {% if last_soc < 25 %}bg-danger{% elif last_soc < 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                                     style="width: {{ last_soc }}%">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle text-center mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>V-Start</th>
+                                    <th>V-Load</th>
+                                    <th>Current</th>
+                                    <th>Resistance (mΩ)</th>
+                                    <th>Temp</th>
+                                    <th>Condition</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in pulse_tests %}
+                                <tr>
+                                    <td class="text-muted small">{{ p.timestamp|date:"H:i:s" }}</td>
+                                    <td class="fw-bold">{{ p.v_before|floatformat:3 }}V</td>
+                                    <td class="text-primary fw-bold">{{ p.v_after|floatformat:3 }}V</td>
+                                    <td>{{ p.current_ma|floatformat:0 }}mA</td>
+                                    <td class="text-danger fw-bold">{{ p.internal_resistance|floatformat:1 }}</td>
+                                    <td>{{ p.temperature_c|floatformat:1 }}°C</td>
+                                    <td>
+                                        <span class="badge {% if p.calculated_soh < 50 %}bg-danger{% else %}bg-success{% endif %}">
+                                            {% if p.calculated_soh < 50 %}Poor{% else %}Good{% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
         {% else %}
-        <div class="alert alert-light text-center">في انتظار استقبال البيانات من الـ ESP32...</div>
+            <div class="text-center py-5">
+                <i class="bi bi-battery-exclamation display-1 text-muted"></i>
+                <h4 class="mt-3">No batteries found.</h4>
+                <button class="btn btn-primary rounded-pill mt-2" data-bs-toggle="modal" data-bs-target="#deviceSettingsModal">Add Your First Battery</button>
+            </div>
         {% endif %}
     </div>
+
+    <div class="modal fade" id="deviceSettingsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header bg-light border-0">
+                    <h5 class="fw-bold m-0 text-dark">Device & Battery Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                
+                <div class="modal-body p-4">
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-primary">Your API Token:</label>
+                        <div class="copy-box" onclick="copyToClipboard('{{ user.api_token }}')">
+                            <code class="text-dark">{{ user.api_token }}</code>
+                            <i id="copyIcon" class="bi bi-clipboard"></i>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <form method="POST" action="{% url 'add_battery' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Switch Active Battery:</label>
+                            <select name="existing_battery" class="form-select" onchange="if(this.value) location.href='?battery_id=' + this.value;">
+                                <option value="">-- Choose to Switch --</option>
+                                {% for batt in user_batteries %}
+                                <option value="{{ batt.id }}" {% if batt.id == current_battery.id %}selected{% endif %}>{{ batt.battery_id }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Add New Battery:</label>
+                            <input type="text" name="battery_id" class="form-control" placeholder="e.g. Battery-03">
+                        </div>
+
+                        <div class="row g-2 mb-4">
+                            <div class="col-6">
+                                <label class="small fw-bold">Capacity (mAh)</label>
+                                <select name="capacity_mah" class="form-select">
+                                    <option value="2500" selected>2500 mAh</option>
+                                    <option value="1200">1200 mAh</option>
+                                    <option value="3500">3500 mAh</option>
+                                    <option value="5000">5000 mAh</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="small fw-bold">Chemistry</label>
+                                <select name="chemistry" class="form-select">
+                                    <option value="li-ion" selected>Li-ion</option>
+                                    <option value="lifepo4">LiFePO4</option>
+                                    <option value="lipo">Lipo</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2 rounded-pill fw-bold">Save & Activate</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        function confirmDelete(batteryId, batteryName) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: `Are you sure you want to delete "${batteryName}" history?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    let deleteUrl = "{% url 'delete_battery' 0 %}".replace('0', batteryId);
+                    window.location.href = deleteUrl;
+                }
+            })
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const icon = document.getElementById('copyIcon');
+                icon.classList.replace('bi-clipboard', 'bi-check-all');
+                icon.classList.add('text-success');
+                setTimeout(() => {
+                    icon.classList.replace('bi-check-all', 'bi-clipboard');
+                    icon.classList.remove('text-success');
+                }, 2000);
+            });
+        }
+
+        setInterval(function() {
+            if (!document.querySelector('.modal.show') && !document.querySelector('.swal2-container')) {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('battery_id')) {
+                    window.location.href = window.location.href;
+                } else {
+                    location.reload();
+                }
+            }
+        }, 15000);
+    </script>
 </body>
 </html>

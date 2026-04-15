@@ -1,0 +1,29 @@
+{
+    "li-ion": {
+        "v_max": 4.2,
+        "v_min": 3.0,
+        "nominal_v": 3.7,
+        "r_new_base": 0.25,
+        "r_dead": 1.80,
+        "full_energy_wh": 4.44,
+        "desc": "ICR 1200mAh - Calibrated for PCB & INA219 Resistance"
+    },
+    "lifepo4": {
+        "v_max": 3.6,
+        "v_min": 2.5,
+        "nominal_v": 3.2,
+        "r_new_base": 0.15,
+        "r_dead": 1.20,
+        "full_energy_wh": 3.84,
+        "desc": "LiFePO4 - Calibrated for PCB Impedance"
+    },
+    "lipo": {
+        "v_max": 4.2,
+        "v_min": 3.2,
+        "nominal_v": 3.7,
+        "r_new_base": 0.10,
+        "r_dead": 1.50,
+        "full_energy_wh": 4.44,
+        "desc": "LiPo - Calibrated for PCB Impedance"
+    }
+}
