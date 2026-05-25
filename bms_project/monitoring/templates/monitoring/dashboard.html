@@ -54,7 +54,7 @@
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
-            // {% endfor %}
+            {% endfor %}
         {% endif %}
 
         {% if current_battery %}
@@ -100,7 +100,7 @@
                     <div class="col-6 col-md-2">
                         <div class="card stat-card p-2 bg-white border-info">
                             <small class="text-muted fw-bold">Energy</small>
-                            <div class="value-display text-info">{{ total_energy|default:"0.0" }}<span class="unit">Wh</span></div>
+                            <div class="value-display text-info">{{ total_energy|floatformat:4 }}<span class="unit">Wh</span></div>
                         </div>
                     </div>
                     <div class="col-6 col-md-2">
@@ -112,7 +112,7 @@
                     <div class="col-6 col-md-2">
                         <div class="card stat-card p-2 bg-white border-dark">
                             <small class="text-muted fw-bold">Cycles</small>
-                            <div class="value-display text-dark">{{ current_battery.cycle_count|floatformat:2|default:"0" }}</div>
+                            <div class="value-display text-dark">{{ live_cycles|floatformat:4 }}</div>
                         </div>
                     </div>
                     <div class="col-12 col-md-4">
@@ -148,7 +148,7 @@
                                     <th>V-Start</th>
                                     <th>V-Load</th>
                                     <th>Current</th>
-                                    <th>Resistance (mΩ)</th>
+                                    <th>Resistance (Ω)</th>
                                     <th>Temp</th>
                                     <th>Condition</th>
                                 </tr>

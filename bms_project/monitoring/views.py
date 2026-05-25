@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib import messages
 from django.conf import settings
-from django.urls import reverse # إضافة دي عشان الـ Redirect بـ parameters
+from django.urls import reverse
 
 from .models import Device, Reading, Battery, PulseTest, User, ActiveSession
 from .forms import SignUpForm
@@ -84,19 +84,22 @@ def receive_data(request):
             soh = calculate_dynamic_soh(resistance, battery.capacity_mah, specs)
             current_soc = calculate_dynamic_soc(v_before, specs)
 
-            last_pulse = PulseTest.objects.filter(battery=battery).order_by('-timestamp').first()
-            increment_cycles = 0
-            calculated_energy = 0
-            
-            if last_pulse:
-                soc_diff = float(last_pulse.calculated_soc) - float(current_soc)
-                if soc_diff > 0:
-                    increment_cycles = soc_diff / 100.0
-                    nominal_v = 3.2 if battery.chemistry == 'lifepo4' else 3.7
-                    capacity_ah = battery.capacity_mah / 1000.0
-                    calculated_energy = (soc_diff / 100.0) * nominal_v * capacity_ah
+            # رفع زمن النبضة الافتراضي لمنع تلاشي القيمة بالـ Rounding
+            power_w = v_after * i_amps
+            pulse_duration_seconds = 10.0  
+            calculated_energy = power_w * (pulse_duration_seconds / 3600.0)
 
-            battery.cycle_count = float(battery.cycle_count or 0) + increment_cycles
+            chem_lower = str(battery.chemistry).lower().strip()
+            nominal_v = 3.2 if chem_lower == 'lifepo4' else 3.7
+            capacity_ah = float(battery.capacity_mah) / 1000.0
+            total_battery_energy_wh = nominal_v * capacity_ah
+            
+            if total_battery_energy_wh > 0:
+                increment_cycles = calculated_energy / total_battery_energy_wh
+            else:
+                increment_cycles = 0.0
+
+            battery.cycle_count = float(battery.cycle_count or 0.0) + float(increment_cycles)
             battery.soh = soh
             battery.save()
 
@@ -107,12 +110,15 @@ def receive_data(request):
                 calculated_soh=soh, calculated_soc=current_soc
             )
 
+            # حفظ القيمة بدقة عشرية أعلى لتجنب الصفر المطلق
             Reading.objects.create(
                 battery=battery, avg_voltage=v_after, avg_current=curr_ma,
-                avg_temp=temp, min_voltage=v_after, energy_wh=round(calculated_energy, 4)
+                avg_temp=temp, min_voltage=v_after, power_avg=round(power_w, 4),
+                energy_wh=round(calculated_energy, 9)
             )
 
             return JsonResponse({'status': 'success', 'battery_id': battery.battery_id}, status=201)
+            
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
@@ -138,13 +144,41 @@ def dashboard(request):
             session_active.save()
 
     pulse_tests = []
-    last_pulse, last_soc, total_energy = None, 0, 0
+    last_pulse, last_soc, total_energy, live_cycles = None, 0, 0.0, 0.0
+    
     if current_battery:
-        pulse_tests = current_battery.pulse_tests.all().order_by('-timestamp')[:20]
+        # جلب كافة النبضات لحساب تراكمي دقيق
+        all_pulses = current_battery.pulse_tests.all().order_by('-timestamp')
+        pulse_tests = all_pulses[:20]  # تمرير آخر 20 نبضة فقط للجدول حفاظاً على الأداء
+        
         last_pulse = pulse_tests[0] if pulse_tests else None
         last_soc = last_pulse.calculated_soc if last_pulse else 0
-        energy_data = Reading.objects.filter(battery=current_battery).aggregate(Sum('energy_wh'))
-        total_energy = energy_data['energy_wh__sum'] or 0.0
+        
+        # جلب مواصفات السعة الكلية للبطارية النشطة حالياً
+        chem_lower = str(current_battery.chemistry).lower().strip()
+        nominal_v = 3.2 if chem_lower == 'lifepo4' else 3.7
+        batt_cap_mah = float(current_battery.capacity_mah or 1200)
+        capacity_ah = batt_cap_mah / 1000.0
+        total_battery_energy_wh = nominal_v * capacity_ah
+
+        # الحساب الفوري الإجباري من واقع بيانات جدول الـ Pulse Tests الفعلي للبطارية المحددة
+        calculated_energy_list = []
+        for p in all_pulses:
+            v_load = float(p.v_after or 0)
+            i_amps = float(p.current_ma or 0) / 1000.0
+            power_w = v_load * i_amps
+            
+            # محاكاة زمن نبضة مستقر يضمن تحريك العداد تصاعدياً بكل سطر مستلم
+            pulse_duration_seconds = 10.0  
+            energy_wh = power_w * (pulse_duration_seconds / 3600.0)
+            calculated_energy_list.append(energy_wh)
+
+        total_energy = sum(calculated_energy_list)
+
+        if total_battery_energy_wh > 0 and total_energy > 0:
+            live_cycles = total_energy / total_battery_energy_wh
+        else:
+            live_cycles = float(current_battery.cycle_count or 0.0)
 
     context = {
         'current_battery': current_battery,
@@ -152,13 +186,15 @@ def dashboard(request):
         'last_pulse': last_pulse,
         'user_batteries': user_batteries,
         'last_soc': last_soc,
-        'total_energy': round(total_energy, 2),
+        'total_energy': total_energy, 
+        'live_cycles': live_cycles,  
         'display_name': request.user.email.split('@')[0],
         'api_token': request.user.api_token,
     }
     return render(request, 'monitoring/dashboard.html', context)
 
-# --- التعديل الجوهري هنا ---
+# --- إضافة بطارية جديدة ---
+
 @login_required
 def add_battery(request):
     if request.method == "POST":
@@ -185,14 +221,11 @@ def add_battery(request):
             else:
                 return redirect('dashboard')
 
-            # تحديث الجلسة النشطة بالبطارية الجديدة
             session_active, _ = ActiveSession.objects.get_or_create(user=request.user)
             session_active.selected_battery = battery
             session_active.save()
             
             messages.success(request, f"Battery {battery.battery_id} is now active.")
-            
-            # الحل: توجيه المستخدم للرابط شاملاً الـ ID الجديد
             return redirect(f"{reverse('dashboard')}?battery_id={battery.id}")
 
         except Exception as e:

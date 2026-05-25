@@ -16,6 +16,7 @@ DEBUG = not ON_PYTHONANYWHERE
 if ON_PYTHONANYWHERE:
     # استبدل 'yourusername' باسم حسابك الحقيقي على الموقع
     ALLOWED_HOSTS = ['asaad77.pythonanywhere.com'] 
+    CSRF_TRUSTED_ORIGINS = ['https://asaad77.pythonanywhere.com']
 else:
     ALLOWED_HOSTS = ['*']
 
@@ -95,3 +96,7 @@ if ON_PYTHONANYWHERE:
 
 LOGIN_REDIRECT_URL = 'dashboard'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# إعدادات إضافية لحل مشكلة الـ 403 على السيرفرات الحقيقية
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True

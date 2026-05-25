@@ -1,9 +1,9 @@
-# -------- User --------
 import uuid
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils import timezone
 
+# -------- User Management --------
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -23,7 +23,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=30, blank=True)
     last_name = models.CharField(max_length=30, blank=True)
-    # التوكن الفريد لكل مستخدم
     api_token = models.CharField(max_length=100, unique=True, default=uuid.uuid4, editable=False)
     
     is_active = models.BooleanField(default=True)
@@ -38,6 +37,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f"{self.email} (Token: {self.api_token[:8]}...)"
 
+
 # -------- Device (ESP32) --------
 class Device(models.Model):
     device_id = models.CharField(max_length=100, unique=True)
@@ -51,6 +51,7 @@ class Device(models.Model):
     def __str__(self):
         return f"{self.device_id} ({self.user.email})"
 
+
 # -------- Battery --------
 class Battery(models.Model):
     battery_id = models.CharField(max_length=100, unique=True)
@@ -59,12 +60,17 @@ class Battery(models.Model):
     chemistry = models.CharField(max_length=50, default='Li-ion')
     installed_at = models.DateTimeField(default=timezone.now)
     soh = models.FloatField(default=100.0)  # State of Health %
-    cycle_count = models.IntegerField(default=0)
+    
+    # التعديل الجوهري هنا: تحويل الحقل إلى FloatField لمنع نظام قاعدة البيانات من تقريب الكسور لصفر
+    cycle_count = models.FloatField(default=0.0)
+
     class Meta:
         verbose_name = "Battery"
-        verbose_name_plural = "Batteries"  # <-- هنا اسم الجمع الصحيح
+        verbose_name_plural = "Batteries"
+
     def __str__(self):
         return f"{self.battery_id} ({self.device.device_id})"
+
 
 # -------- Reading (Aggregated) --------
 class Reading(models.Model):
@@ -73,12 +79,12 @@ class Reading(models.Model):
     avg_current = models.FloatField()
     avg_temp = models.FloatField()
     min_voltage = models.FloatField()
-    max_temp = models.FloatField(null=True, blank=True)  # تعديل
-    power_avg = models.FloatField(null=True, blank=True) # تعديل
-    energy_wh = models.FloatField(null=True, blank=True) # تعديل
-    samples_count = models.IntegerField(default=1)       # تعديل (قيمة افتراضية)
-    period_seconds = models.IntegerField(default=5)      # تعديل (قيمة افتراضية)
-    timestamp = models.DateTimeField(auto_now_add=True)  # تعديل (ليأخذ الوقت الحالي تلقائياً)
+    max_temp = models.FloatField(null=True, blank=True)
+    power_avg = models.FloatField(null=True, blank=True)
+    energy_wh = models.FloatField(null=True, blank=True)
+    samples_count = models.IntegerField(default=1)
+    period_seconds = models.IntegerField(default=5)
+    timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-timestamp']
@@ -87,7 +93,10 @@ class Reading(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.battery.name} - {self.timestamp}"
+        # تم تعديلها هنا إلى battery_id لأن كلاس الـ Battery لا يحتوي على حقل name
+        return f"{self.battery.battery_id} - {self.timestamp}"
+
+
 # -------- Alert --------
 class Alert(models.Model):
     ALERT_TYPES = [
@@ -111,6 +120,8 @@ class Alert(models.Model):
     def __str__(self):
         return f"{self.alert_type} - {self.battery.battery_id} - {self.triggered_at}"
 
+
+# -------- Pulse Test --------
 class PulseTest(models.Model):
     battery = models.ForeignKey(Battery, on_delete=models.CASCADE, related_name='pulse_tests')
     v_before = models.FloatField()
@@ -118,17 +129,21 @@ class PulseTest(models.Model):
     current_ma = models.FloatField()
     temperature_c = models.FloatField()
     
-    # حقول حسابية
     internal_resistance = models.FloatField(null=True, blank=True)
     calculated_soh = models.FloatField(null=True, blank=True)
-    calculated_soc = models.FloatField(null=True, blank=True) # نسبة الشحن %
+    calculated_soc = models.FloatField(null=True, blank=True)
     
     timestamp = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"Pulse {self.battery.battery_id} - {self.timestamp}"
+
+
+# -------- Active Session --------
 class ActiveSession(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='active_session')
     selected_battery = models.ForeignKey(Battery, on_delete=models.SET_NULL, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.username} -> {self.selected_battery}"    
+        return f"{self.user.email} -> {self.selected_battery}"
